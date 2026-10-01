@@ -344,7 +344,9 @@ function classify(items){
 }
 function ensureG(it){if(it.some(x=>x.k==='q'&&x.g===undefined))classify(it)}
 
+let SKIP=[];
 function parse(T,F){
+  SKIP=[];
   const re=/(?:^|\n)[ \t]*[\[(（]?[ \t]*(?:câu[ \t]*hỏi|câu|question|q)[ \t]*\.?[ \t]*\d+[ \t]*[\])）]?[ \t]*[.:)：\-–—]?[ \t]*/gi,ms=[...T.matchAll(re)],out=[];
   if(!ms.length)return out;
   out.push(...blocks(T,F,0,ms[0].index));
@@ -367,9 +369,9 @@ function parse(T,F){
     let isTF = false;
     
     for(const L of labels){
-      // Chấp nhận A. hoặc a. hoặc a) hoặc A. Đ. / A. S.
-      const x = new RegExp('(^|\\s)'+L+'\\s*[.)]\\s*(Đ\\.|S\\.|Đúng|Sai)?\\s*', 'i').exec(seg.slice(p));
-      if(!x) return;
+      // Chỉ nhận nhãn A, B, C, D viết HOA (kèm dấu . hoặc )), theo đúng thứ tự; hỗ trợ A. Đ. / A. S.
+      const x = new RegExp('(^|\\s)'+L+'\\s*[.)]\\s*(Đ\\.|đ\\.|S\\.|s\\.|Đúng|đúng|ĐÚNG|Sai|sai|SAI)?\\s*').exec(seg.slice(p));
+      if(!x){SKIP.push((m[0].match(/\d+/)||['?'])[0]);return}
       if(x[2]) isTF = true;
       P.push([p+x.index+x[1].length, p+x.index+x[0].length]);
       p+=x.index+x[0].length;
@@ -411,7 +413,7 @@ $('file').onchange=async e=>{
     const {buf,eq}=await pre(await f.arrayBuffer());
     const r=await mammoth.convertToHtml({arrayBuffer:buf},{styleMap:['u => u']});
     const {T,F,IM}=flatten(r.value),items=parse(T,F),qs=items.filter(x=>x.k==='q');
-    if(!qs.length){alert('Không nhận diện được câu hỏi nào. Hãy kiểm tra: mỗi câu bắt đầu ở đầu dòng bằng "Question 1" / "Câu 1" và có đủ 4 đáp án A, B, C, D.\n\nĐoạn đầu file đọc được:\n'+T.replace(/\s+/g,' ').trim().slice(0,150));return}
+    if(!qs.length){alert('Không nhận diện được câu hỏi nào. Hãy kiểm tra: mỗi câu bắt đầu ở đầu dòng bằng "Question 1" / "Câu 1" và có đủ 4 đáp án A, B, C, D (chữ IN HOA, theo đúng thứ tự).'+(SKIP.length?'\n\nĐã thấy '+SKIP.length+' câu nhưng thiếu đáp án A, B, C, D in hoa: câu '+SKIP.slice(0,15).join(', ')+(SKIP.length>15?'...':''):'')+'\n\nĐoạn đầu file đọc được:\n'+T.replace(/\s+/g,' ').trim().slice(0,150));return}
     await Promise.all(IM.map(prep));
     const ex={id:'e'+Date.now(),name:f.name.replace(/\.docx$/i,''),at:Date.now(),items,req:'',eq,img:IM};
     const old=lib.find(y=>y.name===ex.name);if(old)ex.req=old.req||'';
@@ -422,6 +424,7 @@ $('file').onchange=async e=>{
           noT=eq.filter(e=>!e.t).length,
           msg=[];
           
+    if(SKIP.length)msg.push(`Có ${SKIP.length} câu bị bỏ qua vì không có đủ 4 đáp án A, B, C, D viết in hoa (câu ${SKIP.slice(0,15).join(', ')}${SKIP.length>15?'...':''}). Hãy kiểm tra lại các câu này trong file gốc.`);
     if(miss)msg.push(`Có ${miss} câu trắc nghiệm không tìm thấy đáp án gạch chân, vui lòng kiểm tra lại file gốc.`);
     if(bad)msg.push(`Có ${bad} hình/công thức ở định dạng EMF/WMF (thường do MathType) mà trình duyệt không hiển thị được. Cách xử lý: dùng chức năng Convert Equations của MathType để chuyển sang Word Equation, hoặc dán lại công thức dưới dạng ảnh PNG, rồi tải lại file. (Nếu chỉ xuất lại file Word thì các công thức này vẫn được giữ nguyên.)`);
     if(noT)msg.push(`Có ${noT} công thức Word không chuyển được, sẽ hiện nhãn [công thức].`);
