@@ -30,12 +30,14 @@ input[type=password]:focus,textarea:focus{border-color:var(--pri);box-shadow:0 0
 .btn.sec{background:#fff;color:var(--pri);border:2px solid var(--pri);padding:8px 14px;font-size:14px}
 .btn.gr{background:linear-gradient(135deg,#16a34a,#059669)}
 .lbox .btn{width:100%;margin-top:14px;font-size:15px;padding:11px 18px}
-header{position:sticky;top:0;z-index:5;background:#fff;box-shadow:0 2px 14px rgba(15,23,42,.1);padding:12px 18px}
-.top{display:flex;justify-content:space-between;align-items:center}
-.top h1{font-size:19px;margin:0}
-.bar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 8px}
-.info{font-size:14px;color:var(--mut)}
-.prog{height:6px;background:var(--bd);border-radius:9px;margin-top:8px;overflow:hidden}
+header{position:sticky;top:0;z-index:5;background:#fff;box-shadow:0 2px 14px rgba(15,23,42,.1);padding:8px 18px 12px}
+.top{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.top h1{font-size:17px;margin:0;white-space:nowrap}
+.bar{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+header .btn,header .btn.sec{padding:7px 13px;font-size:14px;border-radius:10px;line-height:1.4}
+header .btn.sec{border-width:2px;padding:5px 13px}
+.info{flex:1;min-width:0;font-size:13px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog{position:absolute;left:0;right:0;bottom:0;height:5px;background:var(--bd);overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#22c55e,#16a34a);transition:width .4s}
 main{max-width:1560px;margin:18px auto;padding:0 14px 30px}
 .lib,.req{background:#fff;border-radius:16px;padding:14px 20px;margin-bottom:18px;box-shadow:0 2px 10px rgba(15,23,42,.06)}
@@ -52,7 +54,7 @@ main{max-width:1560px;margin:18px auto;padding:0 14px 30px}
 .rh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
 #reqtx{white-space:pre-wrap}
 textarea{width:100%;padding:12px;border:2px solid var(--bd);border-radius:12px;font:inherit;outline:none;resize:vertical}
-.sec{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start;margin-bottom:6px}
+div.sec{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start;margin-bottom:6px}
 .rcol{position:sticky;top:calc(var(--hh) + 12px);max-height:calc(100vh - var(--hh) - 24px);overflow:auto;padding-right:2px}
 .rcol:empty{display:none}
 .typ{display:inline-block;border:0;border-radius:20px;padding:5px 14px;font:600 13px/1.4 system-ui,sans-serif;margin-bottom:12px;text-align:left}
@@ -107,11 +109,19 @@ img.im{max-width:100%;height:auto;vertical-align:middle;border-radius:6px}
 #qnav .dt.bad{background:var(--badbg);border-color:var(--bad)}
 footer{text-align:center;color:var(--mut);font-size:13px;padding:0 0 26px}
 @media(max-width:900px){
-  .sec{grid-template-columns:1fr;gap:0}
+  div.sec{grid-template-columns:1fr;gap:0}
   .rcol{order:-1;position:static;max-height:none;overflow:visible}
   #wrap{grid-template-columns:1fr;gap:14px}
   #qnav{position:static;max-height:none;overflow:visible}
   #qnav .ng{grid-template-columns:repeat(auto-fill,minmax(46px,1fr))}
+}
+@media(max-width:700px){
+  header{position:static;padding:8px 12px 12px}
+  :root{--hh:0px!important}
+  .top h1{order:1;font-size:16px}
+  #out{order:2;margin-left:auto}
+  .bar{order:3;flex-basis:100%}
+  .info{order:4;flex-basis:100%}
 }
 @media(max-width:600px){
   .q{padding:18px}
@@ -138,14 +148,17 @@ footer{text-align:center;color:var(--mut);font-size:13px;padding:0 0 26px}
 
 <div id="app" class="hide">
   <header id="hdr">
-    <div class="top"><h1>📝 Đảo đề trắc nghiệm</h1><button class="btn sec" id="out">Đăng xuất</button></div>
-    <div class="bar">
-      <label class="btn" for="file">📂 Tải file Docx đề gốc</label>
-      <input type="file" id="file" accept=".docx" hidden>
-      <button class="btn" id="shuf" disabled>🔀 Đảo đề</button>
-      <button class="btn gr" id="exp" disabled>⬇️ Xuất file Docx</button>
+    <div class="top">
+      <h1>📝 Đảo đề trắc nghiệm</h1>
+      <div class="bar">
+        <label class="btn" for="file">📂 Tải file Docx đề gốc</label>
+        <input type="file" id="file" accept=".docx" hidden>
+        <button class="btn" id="shuf" disabled>🔀 Đảo đề</button>
+        <button class="btn gr" id="exp" disabled>⬇️ Xuất file Docx</button>
+      </div>
+      <div class="info" id="info"></div>
+      <button class="btn sec" id="out">Đăng xuất</button>
     </div>
-    <div class="info" id="info"></div>
     <div class="prog"><i id="pb"></i></div>
   </header>
   <main>
@@ -570,7 +583,7 @@ function updInfo(){
   }).length;
   $('info').textContent=exam?`${name} • ${code?'Mã đề '+code:'Đề gốc'} • Đã làm ${d.length}/${q.length} • Đúng ${r} (Trắc nghiệm đơn)`:'';
   $('pb').style.width=(q.length?d.length/q.length*100:0)+'%';
-  updNav();
+  setHH();updNav();
 }
 
 /* ---------- Bảng câu hỏi bên trái (bấm số để nhảy tới câu) ---------- */
@@ -593,7 +606,7 @@ function updNav(){
   markCur();
 }
 function markCur(){
-  const hh=$('hdr').offsetHeight||170;let id=null;
+  const H=$('hdr'),hh=getComputedStyle(H).position==='sticky'?H.offsetHeight:0;let id=null;
   for(const el of document.querySelectorAll('#list .q')){if(el.getBoundingClientRect().bottom>hh+30){id=el.dataset.i;break}}
   const nav=$('qnav');
   nav.querySelectorAll('.nb.cur').forEach(b=>b.classList.remove('cur'));
