@@ -40,7 +40,7 @@ header .btn.sec{border-width:2px;padding:5px 13px}
 .prog{position:absolute;left:0;right:0;bottom:0;height:5px;background:var(--bd);overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#22c55e,#16a34a);transition:width .4s}
 main{max-width:1560px;margin:18px auto;padding:0 14px 30px}
-.lib,.req{background:#fff;border-radius:16px;padding:14px 20px;margin-bottom:18px;box-shadow:0 2px 10px rgba(15,23,42,.06)}
+.lib{background:#fff;border-radius:16px;padding:14px 20px;margin-bottom:18px;box-shadow:0 2px 10px rgba(15,23,42,.06)}
 .lib summary{font-weight:700;cursor:pointer}
 .lr{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}
 .lr>div:first-child{display:flex;align-items:center;gap:12px}
@@ -50,9 +50,6 @@ main{max-width:1560px;margin:18px auto;padding:0 14px 30px}
 .tg{background:#fef3c7;color:#92400e;font-size:12px;padding:2px 8px;border-radius:9px;margin-left:6px}
 .mut{color:var(--mut)}
 .note{font-size:13px;color:var(--mut);margin:8px 0 0}
-.req{border-left:5px solid #f59e0b;background:#fffbeb}
-.rh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
-#reqtx{white-space:pre-wrap}
 textarea{width:100%;padding:12px;border:2px solid var(--bd);border-radius:12px;font:inherit;outline:none;resize:vertical}
 div.sec{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start;margin-bottom:6px}
 .rcol{position:sticky;top:calc(var(--hh) + 12px);max-height:calc(100vh - var(--hh) - 24px);overflow:auto;padding-right:2px}
@@ -170,16 +167,8 @@ footer{text-align:center;color:var(--mut);font-size:13px;padding:0 0 26px}
         <label class="btn sec" for="li">⬇️ Nhập thư viện</label>
         <input type="file" id="li" accept=".json" hidden>
       </div>
-      <p class="note">💾 Toàn bộ bài tập (kể cả hình ảnh, công thức), yêu cầu và tiến độ làm bài được lưu ngay trong trình duyệt trên máy tính này, không gửi đi đâu. Nên bấm "Xuất thư viện" để sao lưu định kỳ.</p>
+      <p class="note">💾 Toàn bộ bài tập (kể cả hình ảnh, công thức) và tiến độ làm bài được lưu ngay trong trình duyệt trên máy tính này, không gửi đi đâu. Nên bấm "Xuất thư viện" để sao lưu định kỳ.</p>
     </details>
-    <div id="reqbox" class="req hide">
-      <div class="rh"><b>📌 Yêu cầu bài tập</b><button class="btn sec" id="reqe">✏️ Sửa yêu cầu</button></div>
-      <div id="reqtx"></div>
-      <div id="reqed" class="hide">
-        <textarea id="reqta" rows="4" placeholder="Nhập yêu cầu / hướng dẫn làm bài để học sinh hiểu..."></textarea>
-        <div class="bar"><button class="btn gr" id="reqs">Lưu yêu cầu</button><button class="btn sec" id="reqc">Hủy</button></div>
-      </div>
-    </div>
     <div id="wrap" class="nonav">
       <aside id="qnav" class="hide" aria-label="Bảng câu hỏi"></aside>
       <div id="list"></div>
@@ -356,7 +345,7 @@ function classify(items){
 function ensureG(it){if(it.some(x=>x.k==='q'&&x.g===undefined))classify(it)}
 
 function parse(T,F){
-  const re=/(?:^|\n)[ \t]*(?:câu|question)\s*\d+\s*[.:)]?[ \t]*/gi,ms=[...T.matchAll(re)],out=[];
+  const re=/(?:^|\n)[ \t]*[\[(（]?[ \t]*(?:câu[ \t]*hỏi|câu|question|q)[ \t]*\.?[ \t]*\d+[ \t]*[\])）]?[ \t]*[.:)：\-–—]?[ \t]*/gi,ms=[...T.matchAll(re)],out=[];
   if(!ms.length)return out;
   out.push(...blocks(T,F,0,ms[0].index));
   ms.forEach((m,k)=>{
@@ -422,7 +411,7 @@ $('file').onchange=async e=>{
     const {buf,eq}=await pre(await f.arrayBuffer());
     const r=await mammoth.convertToHtml({arrayBuffer:buf},{styleMap:['u => u']});
     const {T,F,IM}=flatten(r.value),items=parse(T,F),qs=items.filter(x=>x.k==='q');
-    if(!qs.length){alert('Không nhận diện được câu hỏi nào. Hãy kiểm tra: câu bắt đầu bằng "Câu"/"Question" và có đủ 4 đáp án A, B, C, D.');return}
+    if(!qs.length){alert('Không nhận diện được câu hỏi nào. Hãy kiểm tra: mỗi câu bắt đầu ở đầu dòng bằng "Question 1" / "Câu 1" và có đủ 4 đáp án A, B, C, D.\n\nĐoạn đầu file đọc được:\n'+T.replace(/\s+/g,' ').trim().slice(0,150));return}
     await Promise.all(IM.map(prep));
     const ex={id:'e'+Date.now(),name:f.name.replace(/\.docx$/i,''),at:Date.now(),items,req:'',eq,img:IM};
     const old=lib.find(y=>y.name===ex.name);if(old)ex.req=old.req||'';
@@ -445,7 +434,7 @@ $('file').onchange=async e=>{
 function showLib(){
   const a=all();
   $('lt').textContent=`📚 Danh sách bài tập đã đưa lên (${a.length})`;
-  $('libl').innerHTML=a.length?a.map((x,i)=>`<div class="lr"><div><span class="no">${i+1}</span><div><b>${esc(x.name)}</b>${x.shared?'<span class="tg">Đề chung</span>':''}<small>${x.items.filter(k=>k.k==='q').length} câu • ${new Date(x.at).toLocaleDateString('vi-VN')}${x.req?' • 📌 có yêu cầu':''}</small></div></div><div><button class="btn sec" data-a="open" data-id="${esc(x.id)}">Mở</button>${x.shared?'':`<button class="btn sec" data-a="del" data-id="${esc(x.id)}">🗑</button>`}</div></div>`).join('')
+  $('libl').innerHTML=a.length?a.map((x,i)=>`<div class="lr"><div><span class="no">${i+1}</span><div><b>${esc(x.name)}</b>${x.shared?'<span class="tg">Đề chung</span>':''}<small>${x.items.filter(k=>k.k==='q').length} câu • ${new Date(x.at).toLocaleDateString('vi-VN')}</small></div></div><div><button class="btn sec" data-a="open" data-id="${esc(x.id)}">Mở</button>${x.shared?'':`<button class="btn sec" data-a="del" data-id="${esc(x.id)}">🗑</button>`}</div></div>`).join('')
     :'<p class="mut">Chưa có bài tập nào. Hãy tải một file Docx đề gốc, bài tập sẽ được lưu tự động vào đây.</p>';
 }
 $('libl').onclick=e=>{
@@ -454,7 +443,7 @@ $('libl').onclick=e=>{
   if(b.dataset.a==='open')openEx(x);
   else if(confirm('Xóa bài tập "'+x.name+'" khỏi danh sách?')){
     lib=lib.filter(y=>y!==x);save();
-    if(exam===x){exam=null;base=[];cur=[];localStorage.removeItem(SK);render();$('shuf').disabled=$('exp').disabled=true;showReq()}
+    if(exam===x){exam=null;base=[];cur=[];localStorage.removeItem(SK);render();$('shuf').disabled=$('exp').disabled=true}
     showLib();
   }
 };
@@ -475,17 +464,9 @@ $('li').onchange=async e=>{
 function openEx(ex){
   exam=ex;base=ex.items;ensureG(base);name=ex.name;code=0;cur=base.map(x=>({...x}));
   $('shuf').disabled=$('exp').disabled=false;$('libbox').open=false;
-  restore();showReq();render();window.scrollTo({top:0});
+  restore();render();window.scrollTo({top:0});
 }
 
-/* ---------- Yêu cầu bài tập ---------- */
-function showReq(){
-  const ed=exam&&!exam.shared,t=$('reqtx');$('reqbox').classList.toggle('hide',!exam||(!exam.req&&!ed));
-  t.textContent=(exam&&exam.req)||'Chưa có yêu cầu. Bấm "Sửa yêu cầu" để nhập hướng dẫn cho học sinh.';
-  t.classList.toggle('mut',!(exam&&exam.req));t.classList.remove('hide');
-  $('reqed').classList.add('hide');$('reqe').classList.toggle('hide',!ed);
-}
-$('reqe').onclick=()=>{$('reqta').value=exam.req||'';$('reqtx').classList.add('hide');$('reqed').classList.remove('hide');$('reqe').classList.add('hide')};$('reqs').onclick=()=>{exam.req=$('reqta').value.trim();save();showReq();showLib()};$('reqc').onclick=showReq;
 
 /* ---------- Hiển thị chữ + công thức + hình ----------
    Đọc được: công thức Word (OMML), LaTeX gõ trong văn bản ($..$, $$..$$, \(..\), \[..\]),
@@ -713,7 +694,6 @@ $('exp').onclick=async()=>{
     }).join('');
     const P=x=>`<w:p>${x}</w:p>`;
     let n=0,body=P(wt(name+(code?' - Mã đề '+code:''),2));
-    if(exam.req)body+=P(wt(exam.req,4));
     cur.forEach(it=>{
       if(it.k==='h')body+=P(rn(it.runs,2));
       else if(it.k==='p')body+=P(rn(it.runs,0));
@@ -738,7 +718,7 @@ $('exp').onclick=async()=>{
 };
 
 /* ---------- Khởi động ---------- */
-load();showLib();showReq();updInfo();
+load();showLib();updInfo();
 // Đề chung: đặt file exams.json cạnh index.html là học sinh mở lên thấy ngay
 fetch('exams.json').then(r=>r.ok?r.json():[]).then(a=>{
   if(!Array.isArray(a))return;
