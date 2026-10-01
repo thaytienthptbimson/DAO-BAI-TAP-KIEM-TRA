@@ -104,6 +104,11 @@ img.im{max-width:100%;height:auto;vertical-align:middle;border-radius:6px}
 #qnav .dt.done{background:#e0e7ff;border-color:#a5b4fc}
 #qnav .dt.ok{background:var(--okbg);border-color:var(--ok)}
 #qnav .dt.bad{background:var(--badbg);border-color:var(--bad)}
+#optw{position:fixed;inset:0;z-index:20;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px}
+#optw .ob{background:#fff;border-radius:16px;padding:20px 24px;max-width:580px;width:100%;max-height:90vh;overflow:auto}
+#optw h3{margin:0 0 8px}#optw label{display:block;padding:6px 0;font-size:16px;cursor:pointer}
+#optw input[type=checkbox]{width:18px;height:18px;vertical-align:-3px;margin-right:8px}
+#optw .ot{font-weight:700;margin:14px 0 4px}#optw .bar{margin-top:18px}
 footer{text-align:center;color:var(--mut);font-size:13px;padding:0 0 26px}
 @media(max-width:900px){
   div.sec{grid-template-columns:1fr;gap:0}
@@ -151,6 +156,7 @@ footer{text-align:center;color:var(--mut);font-size:13px;padding:0 0 26px}
         <label class="btn" for="file">📂 Tải file Docx đề gốc</label>
         <input type="file" id="file" accept=".docx" hidden>
         <button class="btn" id="shuf" disabled>🔀 Đảo đề</button>
+        <button class="btn sec" id="optb">⚙️ Tùy chọn</button>
         <button class="btn gr" id="exp" disabled>⬇️ Xuất file Docx</button>
       </div>
       <div class="info" id="info"></div>
@@ -158,6 +164,7 @@ footer{text-align:center;color:var(--mut);font-size:13px;padding:0 0 26px}
     </div>
     <div class="prog"><i id="pb"></i></div>
   </header>
+  <div id="optw" class="hide"></div>
   <main>
     <details id="libbox" class="lib" open>
       <summary id="lt">📚 Danh sách bài tập đã đưa lên</summary>
@@ -200,7 +207,7 @@ $('out').onclick=()=>{sessionStorage.removeItem('auth');gate()};
 gate();
 
 /* ---------- Dữ liệu (lưu trong localStorage của trình duyệt trên máy người dùng) ---------- */
-let base=[],cur=[],code=0,name='',tries=0,lib=[],shared=[],exam=null;
+let base=[],cur=[],code=0,name='',tries=0,lib=[],shared=[],exam=null,OPT={p:0,q:1,a:1,fix:[],orig:1};
 const LK='exams_v1',SK='state_v1';
 const all=()=>[...shared,...lib];
 function load(){try{lib=JSON.parse(localStorage.getItem(LK)||'[]')}catch(e){lib=[]}}
@@ -347,7 +354,7 @@ function ensureG(it){if(it.some(x=>x.k==='q'&&x.g===undefined))classify(it)}
 let SKIP=[];
 function parse(T,F){
   SKIP=[];
-  const re=/(?:^|\n)[ \t]*[\[(（]?[ \t]*(?:câu[ \t]*hỏi|câu|question|q)[ \t]*\.?[ \t]*\d+[ \t]*[\])）]?[ \t]*[.:)：\-–—]?[ \t]*/gi,ms=[...T.matchAll(re)],out=[];
+  const re=/(?:^|\n)[ \t]*[\[(（]?[ \t]*((?:câu[ \t]*hỏi|câu|question|q)[ \t]*\.?[ \t]*)\d+[ \t]*[\])）]?[ \t]*([.:)：\-–—]?)[ \t]*/gi,ms=[...T.matchAll(re)],out=[];
   if(!ms.length)return out;
   out.push(...blocks(T,F,0,ms[0].index));
   ms.forEach((m,k)=>{
@@ -357,7 +364,7 @@ function parse(T,F){
     const saMatch = /(?:^|\n)[ \t]*ĐÁP ÁN\s*:\s*/i.exec(seg);
     if(saMatch){
       out.push({
-        k:'q', qtype:'sa',
+        k:'q', qtype:'sa', lb:m[1], sp:m[2],
         stem: mk(T,F,s, s+saMatch.index),
         ansRuns: mk(T,F, s+saMatch.index+saMatch[0].length, e)
       });
@@ -366,13 +373,13 @@ function parse(T,F){
 
     const P=[]; let p=0, endD=s;
     const labels = ['A','B','C','D'];
-    let isTF = false;
+    let isTF = false, ps = '.';
     
     for(const L of labels){
       // Chỉ nhận nhãn A, B, C, D viết HOA (kèm dấu . hoặc )), theo đúng thứ tự; hỗ trợ A. Đ. / A. S.
-      const x = new RegExp('(^|\\s)'+L+'\\s*[.)]\\s*(Đ\\.|đ\\.|S\\.|s\\.|Đúng|đúng|ĐÚNG|Sai|sai|SAI)?\\s*').exec(seg.slice(p));
+      const x = new RegExp('(^|\\s)'+L+'\\s*([.)])\\s*(Đ\\.|đ\\.|S\\.|s\\.|Đúng|đúng|ĐÚNG|Sai|sai|SAI)?\\s*').exec(seg.slice(p));
       if(!x){SKIP.push((m[0].match(/\d+/)||['?'])[0]);return}
-      if(x[2]) isTF = true;
+      if(x[3]) isTF = true; if(L==='A') ps = x[2];
       P.push([p+x.index+x[1].length, p+x.index+x[0].length]);
       p+=x.index+x[0].length;
     }
@@ -394,7 +401,7 @@ function parse(T,F){
     }
 
     out.push({
-      k:'q', qtype: isTF ? 'tf' : 'mc',
+      k:'q', qtype: isTF ? 'tf' : 'mc', lb:m[1], sp:m[2], ps,
       stem:mk(T,F,s,s+P[0][0]),
       opts:o.map((x,i)=>({
           runs: (!isTF && ok===i) ? x.runs.map(r=>({t:r.t,f:r.f&~1})) : x.runs, 
@@ -465,7 +472,7 @@ $('li').onchange=async e=>{
   e.target.value='';
 };
 function openEx(ex){
-  exam=ex;base=ex.items;ensureG(base);name=ex.name;code=0;cur=base.map(x=>({...x}));
+  exam=ex;OPT=loadOpt(ex.id);base=ex.items;ensureG(base);name=ex.name;code=0;cur=base.map(x=>({...x}));
   $('shuf').disabled=$('exp').disabled=false;$('libbox').open=false;
   restore();render();window.scrollTo({top:0});
 }
@@ -503,7 +510,7 @@ function qHtml(q,i,n){
       const val = done ? esc(a) : '';
       const fb = !done ? '' : `<div class="fb good">✅ Đáp án của đề: ${rich(q.ansRuns)}</div>`;
       return `<div class="q" id="q${i}" data-i="${i}" data-n="${n}">
-                <div class="qh">Câu ${n} (Trả lời ngắn)</div>
+                <div class="qh">${q.lb||'Câu '}${n} (Trả lời ngắn)</div>
                 <div class="st">${rich(q.stem)}</div>
                 <div class="os">
                    <input type="text" class="sa-input" data-i="${i}" placeholder="Nhập đáp án của bạn..." value="${val}" ${done?'disabled':''} style="padding:10px; border-radius:8px; border:2px solid var(--bd); width:100%; max-width:400px;">
@@ -528,7 +535,7 @@ function qHtml(q,i,n){
                   </div>`;
       }).join('');
       return `<div class="q" id="q${i}" data-i="${i}" data-n="${n}">
-                <div class="qh">Câu ${n} (Đúng / Sai)</div>
+                <div class="qh">${q.lb||'Câu '}${n} (Đúng / Sai)</div>
                 <div class="st">${rich(q.stem)}</div>
                 <div class="os">${os}</div>
               </div>`;
@@ -537,7 +544,7 @@ function qHtml(q,i,n){
   const ok=q.opts.findIndex(o=>o.ok),a=q.ans,done=a!==undefined;
   const os=q.opts.map((o,j)=>`<button class="o${done&&ok>=0?(o.ok?' ok':j===a?' bad':''):''}" data-j="${j}"${done?' disabled':''}><span class="l">${L4[j]}</span><span>${rich(o.runs)}</span></button>`).join('');
   const fb=!done?'':ok<0?'<div class="fb warn">⚠️ Câu này chưa có đáp án gạch chân trong file gốc.</div>':a===ok?'<div class="fb good">✅ Chính xác!</div>':'';
-  return`<div class="q" id="q${i}" data-i="${i}" data-n="${n}"><div class="qh">Câu ${n}</div><div class="st">${rich(q.stem)}</div><div class="os">${os}</div>${fb}</div>`;
+  return`<div class="q" id="q${i}" data-i="${i}" data-n="${n}"><div class="qh">${q.lb||'Câu '}${n}</div><div class="st">${rich(q.stem)}</div><div class="os">${os}</div>${fb}</div>`;
 }
 
 function render(){
@@ -648,21 +655,56 @@ const rng=a=>()=>{let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t
 const sh=(a,r)=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const keep=q=>q.opts.some(o=>/tất cả|cả\s|all of the|none of the|both\b|neither/i.test(o.runs.map(r=>r.t).join('')));
 const cp=x=>x.k==='q'?{...x,_o:x}:{...x};
+const PART_RE=/^\s*(?:(?:part|section|phần|phan|paper)\b|[IVX]{1,5}\s*[.):\-–])/i,itxt=x=>(x.runs||[]).map(r=>r.t).join('');
+const DOPT=()=>({p:0,q:1,a:1,fix:[],orig:1});
+function loadOpt(id){try{return{...DOPT(),...(JSON.parse(localStorage.getItem('shopt_v1')||'{}')[id]||{})}}catch(e){return DOPT()}}
+function saveOpt(){try{const m=JSON.parse(localStorage.getItem('shopt_v1')||'{}');m[exam.id]=OPT;localStorage.setItem('shopt_v1',JSON.stringify(m))}catch(e){}}
+// Chia đề thành các phần: bắt đầu bằng dòng "Part/Section/Phần/I./II."; không có thì mỗi lời dẫn là một phần
+function getParts(){
+  const bl=[];let i=0;
+  while(i<base.length){const pre=[],qs=[];while(i<base.length&&base[i].k!=='q')pre.push(base[i++]);while(i<base.length&&base[i].k==='q')qs.push(base[i++]);bl.push({pre,qs})}
+  const at=b=>b.pre.findIndex(x=>PART_RE.test(itxt(x))),hasH=bl.some(b=>at(b)>=0),lead=[],list=[];
+  bl.forEach((b,k)=>{
+    const c=at(b);
+    if(!hasH||c>=0){if(k===0&&hasH&&c>0){lead.push({pre:b.pre.slice(0,c),qs:[]});b={pre:b.pre.slice(c),qs:b.qs}}list.push({i:list.length,bl:[b]})}
+    else if(list.length)list[list.length-1].bl.push(b);else lead.push(b);
+  });
+  return{lead,list};
+}
 function build(c){
   if(!c)return base.map(cp);
-  const r=rng(c),out=[];let i=0;
-  while(i<base.length){
-    const pre=[];let qs=[];
-    while(i<base.length&&base[i].k!=='q')pre.push(base[i++]);
-    while(i<base.length&&base[i].k==='q')qs.push(base[i++]);
-    if(qs.length&&!qs[0].g)qs=sh(qs,r);
-    out.push(...pre.map(cp),...qs.map(q=>{
-        if(q.qtype === 'sa') return {...q, _o:q};
-        return {...q,_o:q,opts:keep(q)?q.opts:sh(q.opts,r)}
-    }));
-  }
+  const r=rng(c),P=getParts(),O=OPT,out=[],fx=new Set(O.fix);
+  const flat=b=>b.pre.concat(b.qs).map(cp);
+  const mix=b=>{let qs=b.qs;if(O.q&&qs.length&&!qs[0].g)qs=sh(qs,r);
+    return[...b.pre.map(cp),...qs.map(q=>q.qtype==='sa'||!O.a||keep(q)?{...q,_o:q}:{...q,_o:q,opts:sh(q.opts,r)})]};
+  P.lead.forEach(b=>out.push(...flat(b)));
+  const free=P.list.filter(p=>!fx.has(p.i)),ord=O.p?sh(free,r):free;let k=0;
+  P.list.forEach(p=>{if(fx.has(p.i))out.push(...p.bl.flatMap(flat));else out.push(...ord[k++].bl.flatMap(mix))});
   return out;
 }
+function openOpt(){
+  const P=getParts(),o=OPT,ck=k=>o[k]?'checked':'';
+  $('optw').innerHTML=`<div class="ob"><h3>⚙️ Tùy chọn đảo đề</h3>
+  <label><input type="checkbox" data-k="p" ${ck('p')}>Đảo thứ tự các phần</label>
+  <label><input type="checkbox" data-k="q" ${ck('q')}>Đảo thứ tự câu hỏi trong mỗi phần</label>
+  <label><input type="checkbox" data-k="a" ${ck('a')}>Đảo đáp án A, B, C, D trong mỗi câu</label>
+  <p class="note">Câu có đáp án "Cả A và B / All of the above" giữ nguyên đáp án; câu thuộc bài đọc giữ nguyên thứ tự câu.</p>
+  <div class="ot">🔒 Cố định phần (không đảo vị trí, câu hỏi và đáp án):</div>
+  ${P.list.map(p=>`<label><input type="checkbox" data-f="${p.i}" ${o.fix.includes(p.i)?'checked':''}><b>Phần ${p.i+1}</b> – ${esc((p.bl[0].pre.map(itxt).find(Boolean)||'').slice(0,55))} <small class="mut">(${p.bl.reduce((n,b)=>n+b.qs.length,0)} câu)</small></label>`).join('')||'<p class="note">Chưa có câu hỏi.</p>'}
+  <div class="ot">Xuất file Word</div>
+  <label><input type="checkbox" data-k="orig" ${ck('orig')}>Giữ nguyên văn bản gốc (Question n. / Câu n., A. / A))</label>
+  <div class="bar"><button class="btn" id="o-shuf">🔀 Đảo đề</button><button class="btn sec" id="o-goc">↩️ Về đề gốc</button><button class="btn sec" id="o-x">Đóng</button></div></div>`;
+  $('optw').classList.remove('hide');
+}
+$('optb').onclick=()=>{if(!exam)return alert('Hãy mở một bài tập trước.');openOpt()};
+$('optw').onclick=e=>{const t=e.target,H=()=>$('optw').classList.add('hide');
+  if(t.id==='optw'||t.id==='o-x')return H();
+  if(t.id==='o-shuf'){H();$('shuf').click()}
+  if(t.id==='o-goc'){code=0;cur=build(0);persist();render();H();window.scrollTo({top:0})}};
+$('optw').onchange=e=>{const t=e.target;
+  if(t.dataset.k)OPT[t.dataset.k]=t.checked?1:0;
+  if(t.dataset.f!==undefined){const i=+t.dataset.f;OPT.fix=OPT.fix.filter(x=>x!==i);if(t.checked)OPT.fix.push(i)}
+  saveOpt()};
 function persist(){try{localStorage.setItem(SK,JSON.stringify({id:exam.id,code,ans:cur.map(x=>x.ans===undefined?null:x.ans)}))}catch(e){}}
 function restore(){
   try{
@@ -702,11 +744,11 @@ $('exp').onclick=async()=>{
       else if(it.k==='p')body+=P(rn(it.runs,0));
       else{
           n++;
-          body+=P(wt('Câu '+n+'. ',2)+rn(it.stem,0));
+          body+=P(wt(OPT.orig?((it.lb||'Câu ')+n+(it.sp!==undefined?it.sp:'.')+' '):('Câu '+n+'. '),2)+rn(it.stem,0));
           if(it.qtype === 'sa'){
               body+=P(wt('ĐÁP ÁN: ',2)+rn(it.ansRuns,0));
           } else {
-              it.opts.forEach((o,j)=>body+=P(wt(L4[j]+'. ',0)+rn(o.runs,o.ok?1:0)))
+              it.opts.forEach((o,j)=>body+=P(wt(L4[j]+(OPT.orig?(it.ps||'.'):'.')+' ',0)+rn(o.runs,o.ok?1:0)))
           }
       }
     });
