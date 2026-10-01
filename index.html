@@ -58,11 +58,11 @@ div.sec{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;
 button.typ{cursor:pointer}
 .typ.t1{background:#e0f2fe;color:#075985}
 .typ.t2{background:#fce7f3;color:#9d174d}
-.hd{font-weight:700;font-size:20px;line-height:1.6;background:#eef2ff;border-left:5px solid var(--pri);padding:14px 18px;border-radius:10px;margin:0 0 12px}
-.ps{background:#fff;border-radius:12px;padding:18px 22px;margin-bottom:12px;box-shadow:0 2px 10px rgba(15,23,42,.05);font-size:20px;line-height:1.7}
+.hd{white-space:pre-line;font-weight:700;font-size:20px;line-height:1.6;background:#eef2ff;border-left:5px solid var(--pri);padding:14px 18px;border-radius:10px;margin:0 0 12px}
+.ps{white-space:pre-line;background:#fff;border-radius:12px;padding:18px 22px;margin-bottom:12px;box-shadow:0 2px 10px rgba(15,23,42,.05);font-size:20px;line-height:1.7}
 .q{background:#fff;border-radius:16px;padding:26px;margin-bottom:18px;box-shadow:0 2px 10px rgba(15,23,42,.06);scroll-margin-top:calc(var(--hh) + 20px)}
 .qh{font-weight:700;font-size:19px;color:var(--pri);margin-bottom:8px}
-.st{font-size:22px;line-height:1.65;font-weight:500;margin-bottom:20px;overflow-wrap:anywhere}
+.st{font-size:22px;line-height:1.65;font-weight:500;margin-bottom:20px;overflow-wrap:anywhere;white-space:pre-line}
 .os{display:grid;gap:14px}
 .o{display:flex;gap:14px;align-items:center;text-align:left;padding:16px 18px;border:2px solid var(--bd);border-radius:14px;background:#fff;font:inherit;font-size:21px;line-height:1.55;color:inherit;cursor:pointer;transition:.15s}
 .o:hover:not(:disabled){border-color:var(--pri);background:#eef2ff}
@@ -364,7 +364,7 @@ function parse(T,F){
     const saMatch = /(?:^|\n)[ \t]*ĐÁP ÁN\s*:\s*/i.exec(seg);
     if(saMatch){
       out.push({
-        k:'q', qtype:'sa', lb:m[1], sp:m[2],
+        k:'q', qtype:'sa', lb:m[1], sp:m[2], no:+(m[0].match(/\d+/)||[0])[0],
         stem: mk(T,F,s, s+saMatch.index),
         ansRuns: mk(T,F, s+saMatch.index+saMatch[0].length, e)
       });
@@ -401,7 +401,7 @@ function parse(T,F){
     }
 
     out.push({
-      k:'q', qtype: isTF ? 'tf' : 'mc', lb:m[1], sp:m[2], ps,
+      k:'q', qtype: isTF ? 'tf' : 'mc', lb:m[1], sp:m[2], ps, no:+(m[0].match(/\d+/)||[0])[0],
       stem:mk(T,F,s,s+P[0][0]),
       opts:o.map((x,i)=>({
           runs: (!isTF && ok===i) ? x.runs.map(r=>({t:r.t,f:r.f&~1})) : x.runs, 
@@ -680,7 +680,29 @@ function build(c){
   P.lead.forEach(b=>out.push(...flat(b)));
   const free=P.list.filter(p=>!fx.has(p.i)),ord=O.p?sh(free,r):free;let k=0;
   P.list.forEach(p=>{if(fx.has(p.i))out.push(...p.bl.flatMap(flat));else out.push(...ord[k++].bl.flatMap(mix))});
-  return out;
+  return renum(out);
+}
+// Số trong lời dẫn / đoạn văn (Questions 21-25, from 21 to 25, (21), ...21...) nhảy theo số câu mới
+function renum(out){
+  const qs=base.filter(x=>x.k==='q'),keys=qs.map((q,i)=>q.no||i+1);
+  if(new Set(keys).size!==keys.length)return out;
+  const kof=new Map();qs.forEach((q,i)=>kof.set(q,keys[i]));
+  const mp={};let n=0;out.forEach(x=>{if(x.k==='q'){n++;mp[kof.get(x._o)]=n}});
+  const rg=(a,b)=>{const v=[];for(let k=+a;k<=+b&&k-a<500;k++)if(mp[k]!==undefined)v.push(mp[k]);return v.length?[Math.min(...v),Math.max(...v)]:null};
+  return out.map(x=>{
+    if(x.k==='q')return x;
+    const T=itxt(x);if(!/\d/.test(T))return x;
+    const M=T.replace(/[⟪⟦]\d+[⟫⟧]/g,m=>'\u0001'.repeat(m.length)),R=[],used=(a,b)=>R.some(r=>a<r[1]&&b>r[0]);let m;
+    const reR=/(?:questions?|câu|from|từ)[ \t]*(?:from|từ)?[ \t]*(\d+)[ \t]*(?:to|-|–|—|đến|tới|and|và)[ \t]*(\d+)/gid;
+    while(m=reR.exec(M)){const v=rg(m[1],m[2]);if(v){R.push([...m.indices[1],''+v[0]],[...m.indices[2],''+v[1]])}}
+    const one=re=>{while(m=re.exec(M)){const[a,b]=m.indices[1],v=mp[+m[1]];if(v!==undefined&&!used(a,b))R.push([a,b,''+v])}};
+    one(/(?:questions?|câu)[ \t]*(\d+)/gid);one(/[(\[（][ \t]*(\d+)[ \t]*[)\]）]/gd);one(/(?:[_…]|\.{2,})[ \t]*(\d+)[ \t]*(?:[_…]|\.{2,})/gd);
+    if(!R.length)return x;
+    const ch=[];x.runs.forEach(r=>r.t.split('').forEach(c=>ch.push([c,r.f])));
+    R.sort((a,b)=>b[0]-a[0]).forEach(([a,b,t])=>{const f=ch[a][1];ch.splice(a,b-a,...t.split('').map(c=>[c,f]))});
+    const runs=[];ch.forEach(([c,f])=>{const l=runs[runs.length-1];if(l&&l.f===f)l.t+=c;else runs.push({t:c,f})});
+    return{...x,runs};
+  });
 }
 function openOpt(){
   const P=getParts(),o=OPT,ck=k=>o[k]?'checked':'';
@@ -719,7 +741,7 @@ const XM='http://schemas.openxmlformats.org/',xe=s=>String(s).replace(/[&<>]/g,c
 $('exp').onclick=async()=>{
   try{
     const z=new JSZip(),eq=exam.eq||[],img=exam.img||[],rels=[],ex={};
-    const wt=(t,f)=>{if(!t)return'';const p=(f&2?'<w:b/>':'')+(f&4?'<w:i/>':'')+(f&1?'<w:u w:val="single"/>':'')+(f&8?'<w:vertAlign w:val="subscript"/>':f&16?'<w:vertAlign w:val="superscript"/>':'');return`<w:r>${p?`<w:rPr>${p}</w:rPr>`:''}<w:t xml:space="preserve">${xe(t)}</w:t></w:r>`};
+    const wt=(t,f)=>{if(!t)return'';const p=(f&2?'<w:b/>':'')+(f&4?'<w:i/>':'')+(f&1?'<w:u w:val="single"/>':'')+(f&8?'<w:vertAlign w:val="subscript"/>':f&16?'<w:vertAlign w:val="superscript"/>':'');const rp=p?`<w:rPr>${p}</w:rPr>`:'';return t.split('\n').map(x=>x?`<w:r>${rp}<w:t xml:space="preserve">${xe(x)}</w:t></w:r>`:'').join(`<w:r>${rp}<w:br/></w:r>`)};
     const vs=d=>{try{const v=new DataView(Uint8Array.from(atob(d.split(',')[1].slice(0,88)),c=>c.charCodeAt(0)).buffer);
       if(v.getUint32(0,true)===0x9AC6CDD7){const u=v.getUint16(14,true)||1440;return[(v.getInt16(10,true)-v.getInt16(6,true))/u*96,(v.getInt16(12,true)-v.getInt16(8,true))/u*96]}
       if(v.getUint32(0,true)===1)return[(v.getInt32(32,true)-v.getInt32(24,true))/2540*96,(v.getInt32(36,true)-v.getInt32(28,true))/2540*96]}catch(e){}return[150,40]};
