@@ -539,7 +539,7 @@ function qHtml(q,i,n){
 
   const ok=q.opts.findIndex(o=>o.ok),a=q.ans,done=a!==undefined;
   const os=q.opts.map((o,j)=>`<button class="o${done&&ok>=0?(o.ok?' ok':j===a?' bad':''):''}" data-j="${j}"${done?' disabled':''}><span class="l">${L4[j]}</span><span>${rich(o.runs)}</span></button>`).join('');
-  const fb=!done?'':ok<0?'<div class="fb warn">⚠️ Câu này chưa có đáp án gạch chân trong file gốc.</div>':a===ok?'<div class="fb good">✅ Chính xác!</div>':`<div class="fb no">❌ Chưa đúng. Đáp án đúng: ${L4[ok]}</div>`;
+  const fb=!done?'':ok<0?'<div class="fb warn">⚠️ Câu này chưa có đáp án gạch chân trong file gốc.</div>':a===ok?'<div class="fb good">✅ Chính xác!</div>':'';
   return`<div class="q" id="q${i}" data-i="${i}" data-n="${n}"><div class="qh">Câu ${n}</div><div class="st">${rich(q.stem)}</div><div class="os">${os}</div>${fb}</div>`;
 }
 
